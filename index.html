@@ -3464,12 +3464,133 @@ function notify(msg) {
 }
 
 // ============================================================
+// MIGRACIÓN ONE-SHOT desde localStorage → Supabase
+// ============================================================
+async function migrateFromLocalStorage() {
+  const LS = {
+    tournaments:   'torneoexpress_v2',
+    ranking:       'torneoexpress_ranking',
+    players:       'torneoexpress_players',
+    inscripciones: 'torneoexpress_inscripciones',
+    demanda:       'torneoexpress_demanda',
+    noticias:      'torneoexpress_noticias',
+    video:         'torneoexpress_video'
+  };
+
+  const hasData = Object.values(LS).some(k => localStorage.getItem(k));
+  if (!hasData) return 0;
+
+  let migrated = 0;
+  const errs = [];
+
+  // Torneos
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.tournaments) || '[]');
+    if (data.length) {
+      const rows = data.map(t => ({ id: t.id, data: t, updated_at: new Date().toISOString() }));
+      const { error } = await db.from('tournaments').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+      migrated += data.length;
+    }
+  } catch(e) { errs.push('torneos: ' + e.message); }
+
+  // Ranking
+  try {
+    let raw = JSON.parse(localStorage.getItem(LS.ranking) || '{}');
+    if (Array.isArray(raw)) raw = raw.length ? { General: raw } : {};
+    const cats = Object.keys(raw);
+    if (cats.length) {
+      const rows = cats.map(c => ({ category: c, players: raw[c], updated_at: new Date().toISOString() }));
+      const { error } = await db.from('ranking').upsert(rows, { onConflict: 'category' });
+      if (error) throw error;
+      migrated += cats.length;
+    }
+  } catch(e) { errs.push('ranking: ' + e.message); }
+
+  // Jugadores
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.players) || '[]');
+    if (data.length) {
+      const { error } = await db.from('players_registry')
+        .upsert({ id: 'main', data, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      if (error) throw error;
+      migrated++;
+    }
+  } catch(e) { errs.push('jugadores: ' + e.message); }
+
+  // Inscripciones
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.inscripciones) || '[]');
+    const rows = data.filter(i => i && i.id).map(i => ({ id: i.id, data: i }));
+    if (rows.length) {
+      const { error } = await db.from('inscripciones').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+      migrated += rows.length;
+    }
+  } catch(e) { errs.push('inscripciones: ' + e.message); }
+
+  // Demanda
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.demanda) || '[]');
+    if (data.length) {
+      const { error } = await db.from('demanda')
+        .upsert({ id: 'main', data, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      if (error) throw error;
+      migrated++;
+    }
+  } catch(e) { errs.push('demanda: ' + e.message); }
+
+  // Noticias
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.noticias) || '[]');
+    const rows = data.filter(n => n && n.id).map(n => ({ id: n.id, data: n, updated_at: new Date().toISOString() }));
+    if (rows.length) {
+      const { error } = await db.from('noticias').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+      migrated += rows.length;
+    }
+  } catch(e) { errs.push('noticias: ' + e.message); }
+
+  // Video config
+  try {
+    const data = JSON.parse(localStorage.getItem(LS.video) || 'null');
+    if (data) {
+      const { error } = await db.from('app_settings')
+        .upsert({ key: 'video_config', value: data, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw error;
+      migrated++;
+    }
+  } catch(e) { errs.push('video: ' + e.message); }
+
+  if (errs.length) throw new Error(errs.join(' | '));
+
+  // Limpiar localStorage solo si todo fue exitoso
+  Object.values(LS).forEach(k => localStorage.removeItem(k));
+  return migrated;
+}
+
+// ============================================================
 // INIT
 // ============================================================
 (async () => {
-  // Mostrar indicador mientras se cargan los datos desde Supabase
   const grid = document.getElementById('tournamentsGrid');
-  if (grid) grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#555;font-size:14px">Conectando con Supabase...</div>';
+
+  // Detectar datos locales pendientes de migrar
+  const needsMigration = ['torneoexpress_v2','torneoexpress_ranking','torneoexpress_noticias']
+    .some(k => localStorage.getItem(k));
+
+  if (needsMigration) {
+    if (grid) grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#FFB800;font-size:15px;font-weight:600">⬆ Migrando datos a Supabase...</div>';
+    try {
+      const n = await migrateFromLocalStorage();
+      console.log('[Migración] Completada —', n, 'registros subidos a Supabase');
+    } catch(e) {
+      console.error('[Migración] Error parcial:', e.message);
+      notify('⚠ Migración con errores — revisa la consola');
+    }
+  } else {
+    if (grid) grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#555;font-size:14px">Conectando con Supabase...</div>';
+  }
 
   await Promise.all([
     loadFromStorage(),
@@ -3483,6 +3604,7 @@ function notify(msg) {
 
   updateInscBadge();
   renderDashboard();
+  if (needsMigration) notify('✓ Datos migrados a Supabase correctamente');
 })();
 </script>
 </body>
