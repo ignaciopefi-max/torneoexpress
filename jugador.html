@@ -456,7 +456,6 @@ function renderPubInicio() {
               <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:#606060">
                 ${nextT.date ? `<span>&#128197; ${nextT.date}${nextT.startTime ? ` &middot; ${nextT.startTime}hs` : ''}</span>` : ''}
                 ${nextT.venue ? `<span>&#128205; ${esc(nextT.venue)}</span>` : ''}
-                <span>&#127934; ${(nextT.pairs||[]).length} parejas inscriptas</span>
               </div>
             </div>
             <button class="btn-gold" style="font-size:14px;padding:14px 30px;white-space:nowrap" onclick="openInscripcionModal('${nextT.id}')">Inscribirse ahora</button>
@@ -491,7 +490,6 @@ function renderPubInicio() {
           ${t.venue ? `<div class="tc-h-meta">&#128205; ${esc(t.venue)}</div>` : ''}
         </div>
         <div class="tc-h-footer">
-          <span class="tc-h-pairs">&#127934; ${(t.pairs||[]).length} parejas</span>
           <button class="btn-gold" style="padding:7px 14px;font-size:12px" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
         </div>
       </div>`).join('');
@@ -624,7 +622,6 @@ function renderPubTorneos() {
               <div class="tc-full-meta">
                 ${t.date?`&#128197; ${t.date}${t.startTime?` &middot; ${t.startTime}hs`:''}`:''}&nbsp;&nbsp;
                 ${t.venue?`&#128205; ${esc(t.venue)}&nbsp;&nbsp;`:''}
-                &#127934; ${(t.pairs||[]).length} parejas inscriptas
               </div>
             </div>
             <button class="btn-gold" style="white-space:nowrap" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
