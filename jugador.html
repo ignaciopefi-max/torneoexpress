@@ -412,6 +412,7 @@ function renderPubInicio() {
   const openT = tournaments.filter(t => t.registrationOpen && t.status !== 'finished');
   const latestNews = noticiasData.slice().sort((a,b)=>(b.date||b.timestamp||'').localeCompare(a.date||a.timestamp||'')).slice(0,3);
 
+  // ── Hero ──────────────────────────────────────────────────
   const hero = `
     <div class="pub-hero">
       <div class="pub-hero-eyebrow">Portal del Jugador</div>
@@ -425,52 +426,204 @@ function renderPubInicio() {
       </div>
     </div>`;
 
-  let tourneosBlock = '';
-  if (openT.length) {
-    const cards = openT.map(t => `
-      <div class="tc-h">
-        ${t.imageData?`<img class="tc-h-img" src="${t.imageData}" style="object-position:${t.imagePosition||'center center'}" alt="${esc(t.name)}">`:'<div class="tc-h-stripe"></div>'}
-        <div class="tc-h-body">
-          <div class="tc-h-cat">${esc(t.category||'General')}</div>
-          <div class="tc-h-name">${esc(t.name)}</div>
-          ${t.date?`<div class="tc-h-meta">&#128197; ${t.date}${t.startTime?` &middot; ${t.startTime}hs`:''}</div>`:''}
-          ${t.venue?`<div class="tc-h-meta">&#128205; ${esc(t.venue)}</div>`:''}
-        </div>
-        <div class="tc-h-footer">
-          <span class="tc-h-pairs">&#127934; ${(t.pairs||[]).length} parejas</span>
-          <button class="btn-gold" style="padding:7px 14px;font-size:12px" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
-        </div>
-      </div>`).join('');
-    tourneosBlock = `
-      <div style="margin-bottom:36px">
-        <div class="pub-sec-hdr">
-          <div class="pub-sec-title">Proximos <span>Torneos</span></div>
-          <button class="pub-see-all" onclick="switchPubSection('torneos')">Ver todos →</button>
-        </div>
-        <div class="tourn-scroll-wrap"><div class="tourn-scroll-track">${cards}</div></div>
-      </div>`;
-  } else {
-    tourneosBlock = `
-      <div style="margin-bottom:36px">
-        <div class="pub-sec-hdr">
-          <div class="pub-sec-title">Proximos <span>Torneos</span></div>
-        </div>
-        <div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:32px;text-align:center">
-          <div style="font-size:32px;margin-bottom:12px">&#127934;</div>
-          <div style="font-size:14px;color:#555;margin-bottom:16px">No hay torneos abiertos en este momento.</div>
-          <button class="btn-gold-outline" onclick="openDemandaModal()">Registrar mi interes</button>
-        </div>
-      </div>`;
-  }
-
+  // ── Video de presentacion ─────────────────────────────────
   const videoBlock = videoConfig ? `
-    <div style="margin-bottom:36px">
+    <div style="margin-bottom:40px">
       <div class="pub-sec-hdr" style="margin-bottom:14px">
         <div class="pub-sec-title">&#127909; Video de <span>Presentacion</span></div>
       </div>
       <div class="video-player-wrap">${getEmbedHtml(videoConfig.url)}</div>
     </div>` : '';
 
+  // ── 1. Próxima fecha ─────────────────────────────────────
+  const openWithDate = openT.filter(t => t.date).sort((a,b) => a.date.localeCompare(b.date));
+  const nextT = openWithDate[0] || openT[0] || null;
+  let proximaFechaBlock;
+  if (nextT) {
+    proximaFechaBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#128197; Proxima <span>Fecha</span></div>
+        </div>
+        <div style="background:#0f0f0f;border:1px solid rgba(255,184,0,.35);border-radius:16px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,184,0,.06),0 12px 40px rgba(0,0,0,.5)">
+          ${nextT.imageData
+            ? `<img src="${nextT.imageData}" style="width:100%;height:200px;object-fit:cover;display:block;object-position:${nextT.imagePosition||'center center'}">`
+            : '<div style="height:4px;background:linear-gradient(90deg,#FFB800,#ffd760)"></div>'}
+          <div style="padding:26px 30px;display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              ${nextT.category ? `<div style="font-size:9px;font-weight:800;color:#FFB800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px;opacity:.85">${esc(nextT.category)}</div>` : ''}
+              <div style="font-size:24px;font-weight:900;color:#fff;letter-spacing:-.5px;margin-bottom:14px;line-height:1.15">${esc(nextT.name)}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:#606060">
+                ${nextT.date ? `<span>&#128197; ${nextT.date}${nextT.startTime ? ` &middot; ${nextT.startTime}hs` : ''}</span>` : ''}
+                ${nextT.venue ? `<span>&#128205; ${esc(nextT.venue)}</span>` : ''}
+                <span>&#127934; ${(nextT.pairs||[]).length} parejas inscriptas</span>
+              </div>
+            </div>
+            <button class="btn-gold" style="font-size:14px;padding:14px 30px;white-space:nowrap" onclick="openInscripcionModal('${nextT.id}')">Inscribirse ahora</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    proximaFechaBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#128197; Proxima <span>Fecha</span></div>
+        </div>
+        <div style="background:#141414;border:1px dashed #2a2419;border-radius:14px;padding:40px;text-align:center">
+          <div style="font-size:36px;margin-bottom:12px">&#128197;</div>
+          <div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:8px">Aun no hay fecha confirmada</div>
+          <div style="font-size:13px;color:#484848;margin-bottom:20px">Registra tu interes y te avisamos cuando haya torneos disponibles.</div>
+          <button class="btn-gold-outline" onclick="openDemandaModal()">Registrar mi interes</button>
+        </div>
+      </div>`;
+  }
+
+  // ── 2. Inscripciones abiertas ────────────────────────────
+  let inscripcionesBlock;
+  if (openT.length) {
+    const cards = openT.map(t => `
+      <div class="tc-h">
+        ${t.imageData ? `<img class="tc-h-img" src="${t.imageData}" style="object-position:${t.imagePosition||'center center'}" alt="${esc(t.name)}">` : '<div class="tc-h-stripe"></div>'}
+        <div class="tc-h-body">
+          <div class="tc-h-cat">${esc(t.category||'General')}</div>
+          <div class="tc-h-name">${esc(t.name)}</div>
+          ${t.date ? `<div class="tc-h-meta">&#128197; ${t.date}${t.startTime ? ` &middot; ${t.startTime}hs` : ''}</div>` : ''}
+          ${t.venue ? `<div class="tc-h-meta">&#128205; ${esc(t.venue)}</div>` : ''}
+        </div>
+        <div class="tc-h-footer">
+          <span class="tc-h-pairs">&#127934; ${(t.pairs||[]).length} parejas</span>
+          <button class="btn-gold" style="padding:7px 14px;font-size:12px" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
+        </div>
+      </div>`).join('');
+    inscripcionesBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#9989; Inscripciones <span>Abiertas</span></div>
+          <button class="pub-see-all" onclick="switchPubSection('torneos')">Ver todos →</button>
+        </div>
+        <div class="tourn-scroll-wrap"><div class="tourn-scroll-track">${cards}</div></div>
+      </div>`;
+  } else {
+    inscripcionesBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#9989; Inscripciones <span>Abiertas</span></div>
+        </div>
+        <div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:32px;text-align:center">
+          <div style="font-size:32px;margin-bottom:10px">&#127934;</div>
+          <div style="font-size:14px;color:#555;margin-bottom:16px">No hay torneos con inscripcion abierta en este momento.</div>
+          <button class="btn-gold-outline" onclick="openDemandaModal()">Registrar mi interes</button>
+        </div>
+      </div>`;
+  }
+
+  // ── 3. Últimos resultados ────────────────────────────────
+  const finishedT = tournaments
+    .filter(t => t.status === 'finished' && t.elimination?.final?.winner)
+    .sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  let resultadosBlock;
+  if (finishedT.length) {
+    const last = finishedT[0];
+    const champId = last.elimination.final.winner;
+    const champ = (last.pairs||[]).find(p => p.id === champId);
+    const runnerUpId = [last.elimination.final.pairA, last.elimination.final.pairB].find(id => id && id !== champId);
+    const runnerUp = runnerUpId ? (last.pairs||[]).find(p => p.id === runnerUpId) : null;
+    resultadosBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#127942; Ultimos <span>Resultados</span></div>
+        </div>
+        <div style="background:#0f0f0f;border:1px solid #181818;border-radius:14px;overflow:hidden">
+          <div style="padding:18px 24px;border-bottom:1px solid rgba(255,184,0,.07);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            ${last.category ? `<span style="font-size:9px;font-weight:800;color:#FFB800;letter-spacing:2.5px;text-transform:uppercase;opacity:.85">${esc(last.category)}</span><span style="color:#2a2a2a">&middot;</span>` : ''}
+            <span style="font-size:15px;font-weight:700;color:#f0f0f0">${esc(last.name)}</span>
+            ${last.date ? `<span style="font-size:12px;color:#3a3a3a;margin-left:auto">&#128197; ${last.date}</span>` : ''}
+          </div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:10px">
+            ${champ ? `
+            <div style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.18);border-radius:10px">
+              <span style="font-size:30px;flex-shrink:0">&#127942;</span>
+              <div>
+                <div style="font-size:9px;font-weight:800;color:#FFB800;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px">Campeones</div>
+                <div style="font-size:18px;font-weight:900;color:#fff;letter-spacing:-.3px">${esc(champ.name)}</div>
+              </div>
+            </div>` : ''}
+            ${runnerUp ? `
+            <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#111;border:1px solid #1e1e1e;border-radius:10px">
+              <span style="font-size:26px;flex-shrink:0">&#129352;</span>
+              <div>
+                <div style="font-size:9px;font-weight:800;color:#a0a0a0;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px">Subcampeones</div>
+                <div style="font-size:16px;font-weight:700;color:#b0b0b0">${esc(runnerUp.name)}</div>
+              </div>
+            </div>` : ''}
+          </div>
+        </div>
+      </div>`;
+  } else {
+    resultadosBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#127942; Ultimos <span>Resultados</span></div>
+        </div>
+        <div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:40px;text-align:center">
+          <div style="font-size:36px;margin-bottom:12px">&#127942;</div>
+          <div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:8px">Aun no hay resultados disponibles</div>
+          <div style="font-size:13px;color:#484848">Los resultados apareceran aqui cuando finalice el primer torneo.</div>
+        </div>
+      </div>`;
+  }
+
+  // ── 4. Ranking actualizado — top 5 ───────────────────────
+  const cats = getAllCategories();
+  let rankingBlock;
+  if (cats.length) {
+    const featCat = cats[0];
+    const topPlayers = (rankingData[featCat]||[]).slice().sort((a,b) => b.points - a.points).slice(0, 5);
+    const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
+    const rows = topPlayers.length
+      ? topPlayers.map((p,i) => {
+          const posCol = i===0 ? '#FFB800' : i===1 ? '#a0a0a0' : i===2 ? '#cd7f32' : '#555';
+          return `<tr>
+            <td style="color:${posCol};text-align:center;padding:12px 14px;border-bottom:1px solid #0d0d0d;font-size:15px">${medals[i]||i+1}</td>
+            <td style="padding:12px 14px;border-bottom:1px solid #0d0d0d;font-size:14px;color:#b0b0b0;font-weight:${i<3?700:500}">${esc(p.name)}</td>
+            <td style="text-align:right;padding:12px 14px;border-bottom:1px solid #0d0d0d;font-size:15px;font-weight:800;color:#FFB800">${p.points}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="3" style="text-align:center;color:#555;padding:28px;font-size:13px">Sin datos para esta categoria</td></tr>`;
+    rankingBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#127941; Ranking <span>Actualizado</span></div>
+          <button class="pub-see-all" onclick="switchPubSection('ranking')">Ver completo →</button>
+        </div>
+        <div style="background:#0a0a0a;border:1px solid rgba(255,184,0,.1);border-radius:12px;overflow:hidden;margin-bottom:12px">
+          <div style="padding:10px 16px;background:#0f0f0f;border-bottom:1px solid rgba(255,184,0,.08);font-size:10px;font-weight:800;color:#FFB800;letter-spacing:2px;text-transform:uppercase">Categoria: ${esc(featCat)}</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="background:#0a0a0a;color:#FFB800;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:10px 14px;border-bottom:1px solid rgba(255,184,0,.1);text-align:center;width:52px">#</th>
+              <th style="background:#0a0a0a;color:#FFB800;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:10px 14px;border-bottom:1px solid rgba(255,184,0,.1);text-align:left">Jugador</th>
+              <th style="background:#0a0a0a;color:#FFB800;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:10px 14px;border-bottom:1px solid rgba(255,184,0,.1);text-align:right">Pts</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <button class="btn-gold-outline" style="width:100%" onclick="switchPubSection('ranking')">Ver ranking completo →</button>
+      </div>`;
+  } else {
+    rankingBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">&#127941; Ranking <span>Actualizado</span></div>
+        </div>
+        <div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:40px;text-align:center">
+          <div style="font-size:36px;margin-bottom:12px">&#127941;</div>
+          <div style="font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:8px">Ranking no disponible aun</div>
+          <div style="font-size:13px;color:#484848">El ranking se publicara cuando el administrador lo configure.</div>
+        </div>
+      </div>`;
+  }
+
+  // ── 5. Novedades ─────────────────────────────────────────
   const noveltyCards = latestNews.length
     ? latestNews.map(n=>`
         <div class="pub-nc">
@@ -496,7 +649,7 @@ function renderPubInicio() {
       ${noveltyCards}
     </div>`;
 
-  return hero + videoBlock + tourneosBlock + newsBlock;
+  return hero + videoBlock + proximaFechaBlock + inscripcionesBlock + resultadosBlock + rankingBlock + newsBlock;
 }
 
 // ============================================================
