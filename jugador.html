@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torneos Express — Portal del Jugador</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#080808;color:#f0f0f0;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+
+/* ── Notification ── */
+.notification{position:fixed;bottom:22px;right:22px;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 18px rgba(0,0,0,.45);border:1px solid #2a2a2a;animation:fadeInUp .25s ease}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.hidden{display:none}
+.modal{background:#111;border:1px solid #222;border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:18px;font-weight:800;color:#fff;margin-bottom:18px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f0f0f0;font-size:14px;padding:9px 12px;outline:none;font-family:inherit;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{border-color:rgba(255,184,0,.5)}
+.pair-form-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:560px){.pair-form-cols{grid-template-columns:1fr}}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.btn-primary{background:#FFB800;color:#000;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s}
+.btn-primary:hover{background:#ffc933}
+.btn-secondary{background:#1e1e1e;color:#aaa;border:1px solid #2a2a2a;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-secondary:hover{background:#222}
+
+/* ── Public View Layout ── */
+#publicView{display:flex;height:100vh;background:#080808;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+#pubSidebar{width:232px;background:#0a0a0a;border-right:1px solid rgba(255,184,0,.08);flex-shrink:0;display:flex;flex-direction:column}
+.pub-sidebar-brand{padding:24px 20px 20px;border-bottom:1px solid rgba(255,184,0,.07);display:flex;align-items:center;gap:12px}
+.pub-sidebar-brand-logo{width:34px;height:34px;object-fit:contain;border-radius:5px;flex-shrink:0}
+.pub-sidebar-brand-text{}
+.pub-sidebar-brand-name{font-size:12px;font-weight:800;color:#FFB800;letter-spacing:.6px;text-transform:uppercase}
+.pub-sidebar-brand-sub{font-size:10px;color:#383838;margin-top:2px;letter-spacing:.2px}
+.pub-sidebar-nav{flex:1;padding:6px 0;overflow-y:auto}
+.pub-nav-item{display:flex;align-items:center;gap:13px;padding:13px 20px;font-size:13px;font-weight:600;color:#555;cursor:pointer;border:none;border-left:2px solid transparent;background:none;width:100%;text-align:left;transition:color .17s,background .17s,border-color .17s;letter-spacing:.1px}
+.pub-nav-item:hover{color:#bbb;background:rgba(255,184,0,.03)}
+.pub-nav-item.active{color:#FFB800;background:rgba(255,184,0,.06);border-left-color:#FFB800}
+.pub-nav-item .nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+#pubMain{flex:1;overflow-y:auto;scroll-behavior:smooth}
+#pubContent{max-width:940px;margin:0 auto;padding:40px 32px}
+
+/* ── Hero ── */
+.pub-hero{background:#0a0a0a;border:1px solid rgba(255,184,0,.12);border-radius:20px;padding:56px 52px;margin-bottom:52px;position:relative;overflow:hidden}
+.pub-hero::before{content:'';position:absolute;top:-100px;right:-100px;width:380px;height:380px;background:radial-gradient(circle,rgba(255,184,0,.065) 0%,transparent 60%);pointer-events:none}
+.pub-hero::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,184,0,.2),transparent)}
+.pub-hero-eyebrow{font-size:9px;font-weight:800;letter-spacing:3px;color:#FFB800;text-transform:uppercase;margin-bottom:18px;opacity:.8}
+.pub-hero-title{font-size:46px;font-weight:900;color:#fff;line-height:1;margin-bottom:16px;letter-spacing:-1.5px}
+.pub-hero-sub{font-size:15px;color:#555;margin-bottom:36px;max-width:420px;line-height:1.7}
+.pub-hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn-gold{background:#FFB800;color:#000;border:none;border-radius:8px;padding:13px 28px;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s,transform .15s,box-shadow .15s;letter-spacing:.2px;box-shadow:0 4px 18px rgba(255,184,0,.22)}
+.btn-gold:hover{background:#ffc933;transform:translateY(-1px);box-shadow:0 6px 24px rgba(255,184,0,.32)}
+.btn-gold-outline{background:transparent;color:#FFB800;border:1.5px solid rgba(255,184,0,.45);border-radius:8px;padding:12px 24px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.1px}
+.btn-gold-outline:hover{border-color:#FFB800;background:rgba(255,184,0,.06)}
+
+/* ── Section headers ── */
+.pub-sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.pub-sec-title{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px}
+.pub-sec-title span{color:#FFB800}
+.pub-see-all{font-size:11px;font-weight:700;color:#FFB800;background:none;border:none;cursor:pointer;padding:0;opacity:.75;transition:opacity .15s}
+.pub-see-all:hover{opacity:1;text-decoration:underline;text-underline-offset:3px}
+
+/* ── Horizontal scroll cards ── */
+.tourn-scroll-wrap{overflow-x:auto;margin:0 -2px;padding:4px 2px 18px;scrollbar-width:thin;scrollbar-color:rgba(255,184,0,.15) transparent}
+.tourn-scroll-track{display:flex;gap:16px;width:max-content}
+.tc-h{background:#0f0f0f;border:1px solid #181818;border-radius:14px;width:258px;flex-shrink:0;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;cursor:default}
+.tc-h:hover{border-color:rgba(255,184,0,.55);transform:translateY(-3px);box-shadow:0 10px 36px rgba(0,0,0,.55)}
+.tc-h-stripe{height:3px;background:linear-gradient(90deg,#FFB800,#ffd760)}
+.tc-h-img{width:100%;height:142px;object-fit:cover;display:block}
+.tc-h-body{padding:16px 18px}
+.tc-h-cat{font-size:9px;font-weight:800;color:#FFB800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85}
+.tc-h-name{font-size:15px;font-weight:700;color:#f0f0f0;margin-bottom:10px;line-height:1.25;letter-spacing:-.2px}
+.tc-h-meta{font-size:11px;color:#484848;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.tc-h-footer{padding:12px 18px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center}
+.tc-h-pairs{font-size:11px;color:#3a3a3a}
+
+/* ── Full tournament cards ── */
+.tc-full{background:#0f0f0f;border:1px solid #181818;border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .2s,box-shadow .2s;display:flex}
+.tc-full:hover{border-color:rgba(255,184,0,.5);box-shadow:0 6px 28px rgba(0,0,0,.45)}
+.tc-full-stripe{width:3px;background:linear-gradient(180deg,#FFB800,#ffd760);flex-shrink:0}
+.tc-full-body{padding:20px 24px;flex:1;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.tc-full-img{width:80px;height:80px;object-fit:cover;border-radius:10px;flex-shrink:0}
+.tc-full-info{flex:1;min-width:180px}
+.tc-full-cat{font-size:9px;font-weight:800;color:#FFB800;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:6px;opacity:.85}
+.tc-full-name{font-size:17px;font-weight:700;color:#f0f0f0;margin-bottom:6px;letter-spacing:-.3px}
+.tc-full-meta{font-size:12px;color:#484848;line-height:1.7}
+
+/* ── Category filter chips ── */
+.cat-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+.cat-chip{padding:6px 16px;font-size:11px;font-weight:700;border-radius:20px;border:1px solid #1c1c1c;background:#0f0f0f;color:#484848;cursor:pointer;transition:all .15s;letter-spacing:.3px}
+.cat-chip:hover{border-color:rgba(255,184,0,.45);color:#FFB800}
+.cat-chip.active{background:#FFB800;color:#000;border-color:#FFB800}
+
+/* ── Ranking ── */
+.pub-rank-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.pub-rank-tab{padding:7px 18px;font-size:11px;font-weight:700;border-radius:8px;border:1px solid #1c1c1c;background:#0f0f0f;color:#484848;cursor:pointer;transition:all .15s;letter-spacing:.3px}
+.pub-rank-tab:hover{border-color:rgba(255,184,0,.45);color:#FFB800}
+.pub-rank-tab.active{background:#FFB800;color:#000;border-color:#FFB800}
+.pub-rtable{width:100%;border-collapse:collapse}
+.pub-rtable th{background:#0a0a0a;color:#FFB800;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;padding:12px 16px;border-bottom:1px solid rgba(255,184,0,.12);text-align:left}
+.pub-rtable td{padding:14px 16px;border-bottom:1px solid #0f0f0f;font-size:14px;color:#b0b0b0;transition:background .12s}
+.pub-rtable tr:hover td{background:rgba(255,184,0,.025)}
+.pub-rtable .pos-gold{color:#FFB800;font-weight:900}
+.pub-rtable .pos-silver{color:#a0a0a0;font-weight:900}
+.pub-rtable .pos-bronze{color:#cd7f32;font-weight:900}
+
+/* ── News cards ── */
+.pub-nc{background:#0f0f0f;border:1px solid #181818;border-radius:14px;padding:24px 26px;margin-bottom:12px;transition:border-color .2s,box-shadow .2s}
+.pub-nc:hover{border-color:rgba(255,184,0,.4);box-shadow:0 4px 22px rgba(0,0,0,.35)}
+.pub-nc-title{font-size:18px;font-weight:700;color:#f0f0f0;margin-bottom:10px;letter-spacing:-.3px;line-height:1.3}
+.pub-nc-body{font-size:14px;color:#555;line-height:1.75;white-space:pre-wrap}
+
+/* ── Demand box ── */
+.pub-demand-box{background:rgba(255,184,0,.03);border:1px dashed rgba(255,184,0,.18);border-radius:14px;padding:28px;margin-top:32px}
+.pub-demand-box-t{font-size:16px;font-weight:700;color:#FFB800;margin-bottom:8px}
+.pub-demand-box-s{font-size:13px;color:#484848;margin-bottom:18px;line-height:1.65}
+
+/* ── Empty state ── */
+.pub-empty{text-align:center;padding:80px 20px}
+.pub-empty-icon{font-size:48px;margin-bottom:18px;opacity:.5}
+.pub-empty-t{font-size:19px;font-weight:700;color:#f0f0f0;margin-bottom:8px;letter-spacing:-.3px}
+.pub-empty-s{font-size:14px;color:#383838;margin-bottom:28px;line-height:1.7;max-width:320px;margin-left:auto;margin-right:auto}
+
+/* ── Tipo badge ── */
+.tipo-badge{display:inline-block;font-size:9px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:1.5px;text-transform:uppercase}
+.tipo-noticia{background:#FFB800;color:#000}
+.tipo-consejo{background:#22d3ee;color:#000}
+.tipo-anuncio{background:#a855f7;color:#fff}
+
+/* ── Post image ── */
+.post-img{width:100%;max-height:280px;object-fit:cover;border-radius:10px;margin-bottom:14px;display:block}
+
+/* ── Video player ── */
+.video-player-wrap{border-radius:14px;overflow:hidden;border:1px solid rgba(255,184,0,.1);margin-bottom:40px;background:#000;position:relative;aspect-ratio:16/9;max-width:640px}
+.video-player-wrap iframe,.video-player-wrap video{position:absolute;top:0;left:0;width:100%;height:100%;border:none}
+
+/* ── Mobile ── */
+@media(max-width:700px){
+  #publicView{flex-direction:column}
+  #pubSidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid rgba(255,184,0,.08);flex-direction:row;align-items:center}
+  .pub-sidebar-brand{display:none}
+  .pub-sidebar-nav{display:flex;flex-direction:row;padding:0;overflow-x:auto;width:100%}
+  .pub-nav-item{padding:11px 14px;border-left:none;border-bottom:2px solid transparent;flex-direction:column;gap:3px;font-size:10px;font-weight:700;min-width:64px;justify-content:center;align-items:center;flex:1}
+  .pub-nav-item .nav-icon{font-size:20px}
+  .pub-nav-item.active{border-bottom-color:#FFB800;border-left:none;background:rgba(255,184,0,.05)}
+  #pubMain{flex:1;min-height:0}
+  #pubContent{padding:22px 16px}
+  .pub-hero{padding:32px 22px;margin-bottom:32px}
+  .pub-hero-title{font-size:28px}
+  .pub-hero-sub{font-size:14px}
+  .tc-h{width:224px}
+}
+</style>
+</head>
+<body>
+
+<div id="publicView">
+  <div id="pubSidebar">
+    <div class="pub-sidebar-brand">
+      <img src="logo.png.jpeg" alt="TE" class="pub-sidebar-brand-logo">
+      <div class="pub-sidebar-brand-text">
+        <div class="pub-sidebar-brand-name">Torneos Express</div>
+        <div class="pub-sidebar-brand-sub">Portal del Jugador</div>
+      </div>
+    </div>
+    <nav class="pub-sidebar-nav">
+      <button class="pub-nav-item active" id="pubNavInicio" onclick="switchPubSection('inicio')">
+        <span class="nav-icon">&#127968;</span><span>Inicio</span>
+      </button>
+      <button class="pub-nav-item" id="pubNavTorneos" onclick="switchPubSection('torneos')">
+        <span class="nav-icon">&#127934;</span><span>Torneos</span>
+      </button>
+      <button class="pub-nav-item" id="pubNavRanking" onclick="switchPubSection('ranking')">
+        <span class="nav-icon">&#127941;</span><span>Ranking</span>
+      </button>
+      <button class="pub-nav-item" id="pubNavNoticias" onclick="switchPubSection('noticias')">
+        <span class="nav-icon">&#128226;</span><span>Novedades</span>
+      </button>
+    </nav>
+  </div>
+  <div id="pubMain">
+    <div id="pubContent">
+      <div style="text-align:center;padding:100px 20px;color:#444;font-size:14px">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Inscripcion Modal -->
+<div class="modal-overlay hidden" id="inscripcionModal">
+  <div class="modal" style="max-width:660px">
+    <h3>Inscripción al Torneo</h3>
+    <div id="inscripcionTournInfo" style="background:#222;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#aaa"></div>
+    <input type="hidden" id="inscTournId">
+    <div class="form-group">
+      <label>Categoría</label>
+      <input id="inscCategory" list="inscCatList" placeholder="Ej: 1ra, Damas A+">
+      <datalist id="inscCatList"></datalist>
+    </div>
+    <div class="pair-form-cols" style="margin-top:4px">
+      <div class="pair-form-col">
+        <div style="font-size:13px;font-weight:700;color:#4af;margin-bottom:12px;text-align:center;padding-bottom:6px;border-bottom:1px solid #2a2a2a">Jugador 1</div>
+        <div class="form-group"><label>Nombre y apellidos <span style="color:#f44;font-size:12px">*</span></label><input id="inscP1Name" placeholder="Tu nombre"></div>
+        <div class="form-group"><label>Teléfono <span style="color:#f44;font-size:12px">*</span></label><input id="inscP1Phone" type="tel" placeholder="600 000 000"></div>
+        <div class="form-group"><label>Comuna <span style="font-size:11px;color:#555">(opcional)</span></label><input id="inscP1Comuna" placeholder="Ej: Santiago"></div>
+      </div>
+      <div class="pair-form-col">
+        <div style="font-size:13px;font-weight:700;color:#4af;margin-bottom:12px;text-align:center;padding-bottom:6px;border-bottom:1px solid #2a2a2a">Jugador 2</div>
+        <div class="form-group"><label>Nombre y apellidos <span style="color:#f44;font-size:12px">*</span></label><input id="inscP2Name" placeholder="Nombre del/la compañero/a"></div>
+        <div class="form-group"><label>Teléfono <span style="color:#f44;font-size:12px">*</span></label><input id="inscP2Phone" type="tel" placeholder="600 000 000"></div>
+        <div class="form-group"><label>Comuna <span style="font-size:11px;color:#555">(opcional)</span></label><input id="inscP2Comuna" placeholder="Ej: Providencia"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeInscripcionModal()">Cancelar</button>
+      <button class="btn-primary" onclick="submitInscripcion()">Enviar inscripción</button>
+    </div>
+  </div>
+</div>
+
+<!-- Demanda Modal -->
+<div class="modal-overlay hidden" id="demandaModal">
+  <div class="modal" style="max-width:660px">
+    <h3>Registrar interés por categoría</h3>
+    <p style="font-size:13px;color:#aaa;margin-bottom:16px">No hay torneo disponible, pero dejá tus datos y el administrador lo tendrá en cuenta para organizar torneos futuros.</p>
+    <div class="form-group">
+      <label>Categoría de interés <span style="color:#f44;font-size:12px">*</span></label>
+      <input id="demandaCategory" list="demandaCatList" placeholder="Ej: 1ra, Damas A+">
+      <datalist id="demandaCatList"></datalist>
+    </div>
+    <div class="pair-form-cols" style="margin-top:4px">
+      <div class="pair-form-col">
+        <div style="font-size:13px;font-weight:700;color:#4af;margin-bottom:12px;text-align:center;padding-bottom:6px;border-bottom:1px solid #2a2a2a">Jugador 1</div>
+        <div class="form-group"><label>Nombre y apellidos <span style="color:#f44;font-size:12px">*</span></label><input id="demP1Name" placeholder="Tu nombre"></div>
+        <div class="form-group"><label>Teléfono <span style="color:#f44;font-size:12px">*</span></label><input id="demP1Phone" type="tel" placeholder="600 000 000"></div>
+      </div>
+      <div class="pair-form-col">
+        <div style="font-size:13px;font-weight:700;color:#4af;margin-bottom:12px;text-align:center;padding-bottom:6px;border-bottom:1px solid #2a2a2a">Jugador 2</div>
+        <div class="form-group"><label>Nombre y apellidos <span style="color:#f44;font-size:12px">*</span></label><input id="demP2Name" placeholder="Nombre del/la compañero/a"></div>
+        <div class="form-group"><label>Teléfono <span style="color:#f44;font-size:12px">*</span></label><input id="demP2Phone" type="tel" placeholder="600 000 000"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeDemandaModal()">Cancelar</button>
+      <button class="btn-primary" onclick="submitDemanda()">Registrar interés</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let tournaments = [];
+let rankingData = {};
+let inscripcionesData = [];
+let demandaData = [];
+let noticiasData = [];
+let videoConfig = null;
+let currentPubSection = 'inicio';
+let currentRankingCategory = null;
+let currentPubTournCat = null;
+const DEFAULT_CATEGORIES = ['1ra','2da','3ra','4ta','5ta','6ta','Damas A+','Damas B'];
+
+// ============================================================
+// SUPABASE — READ-ONLY for most tables, WRITE for inscripciones & demanda
+// ============================================================
+const _SB_URL = 'https://ehglumeodvuhmjoisnfu.supabase.co';
+const _SB_KEY = 'sb_publishable_U4-e1MTAfnb8i0kPX-kVJA_KuPMpP2C';
+const db = window.supabase.createClient(_SB_URL, _SB_KEY);
+
+function _sbFire(label, fn) {
+  fn().catch(e => {
+    console.error('[Supabase] ' + label + ':', e.message || e);
+    notify('⚠ Error al guardar (' + label + ')');
+  });
+}
+
+async function loadTournaments() {
+  try {
+    const { data, error } = await db.from('tournaments').select('id, data');
+    if (error) throw error;
+    tournaments = (data || []).map(r => r.data);
+  } catch(e) { console.error('[Supabase] loadTournaments:', e.message || e); tournaments = []; }
+}
+
+async function loadRanking() {
+  try {
+    const { data, error } = await db.from('ranking').select('category, players');
+    if (error) throw error;
+    rankingData = {};
+    (data || []).forEach(r => { rankingData[r.category] = r.players; });
+  } catch(e) { console.error('[Supabase] loadRanking:', e.message || e); rankingData = {}; }
+}
+
+async function loadInscripciones() {
+  try {
+    const { data, error } = await db.from('inscripciones').select('id, data');
+    if (error) throw error;
+    inscripcionesData = (data || []).map(r => r.data);
+  } catch(e) { console.error('[Supabase] loadInscripciones:', e.message || e); inscripcionesData = []; }
+}
+
+async function loadDemanda() {
+  try {
+    const { data, error } = await db.from('demanda').select('data').eq('id','main').single();
+    if (error && error.code !== 'PGRST116') throw error;
+    demandaData = (data && data.data) ? data.data : [];
+  } catch(e) { console.error('[Supabase] loadDemanda:', e.message || e); demandaData = []; }
+}
+
+async function loadNoticias() {
+  try {
+    const { data, error } = await db.from('noticias').select('id, data');
+    if (error) throw error;
+    noticiasData = (data || []).map(r => r.data);
+  } catch(e) { console.error('[Supabase] loadNoticias:', e.message || e); noticiasData = []; }
+}
+
+async function loadVideoConfig() {
+  try {
+    const { data, error } = await db.from('app_settings').select('value').eq('key','video_config').single();
+    if (error && error.code !== 'PGRST116') throw error;
+    videoConfig = (data && data.value) ? data.value : null;
+  } catch(e) { console.error('[Supabase] loadVideoConfig:', e.message || e); videoConfig = null; }
+}
+
+function saveInscripcionesToStorage() {
+  _sbFire('inscripciones', async () => {
+    const rows = inscripcionesData.map(i => ({ id: i.id, data: i }));
+    if (rows.length) {
+      const { error } = await db.from('inscripciones').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+    }
+  });
+}
+
+function saveDemandaToStorage() {
+  _sbFire('demanda', async () => {
+    const { error } = await db.from('demanda')
+      .upsert({ id: 'main', data: demandaData, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) throw error;
+  });
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function notify(msg) {
+  const el = document.createElement('div');
+  el.className = 'notification'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+function tipoBadge(tipo) {
+  const cfg = {noticia:{l:'Noticia',cls:'tipo-noticia'},consejo:{l:'Consejo',cls:'tipo-consejo'},anuncio:{l:'Anuncio',cls:'tipo-anuncio'}};
+  const c = cfg[tipo] || {l: tipo||'General', cls:'tipo-noticia'};
+  return `<span class="tipo-badge ${c.cls}">${c.l}</span>`;
+}
+
+function getEmbedHtml(url) {
+  if (!url) return '';
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (ytMatch) return `<iframe src="https://www.youtube.com/embed/${ytMatch[1]}" allowfullscreen title="Video"></iframe>`;
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return `<iframe src="https://player.vimeo.com/video/${vmMatch[1]}" allowfullscreen title="Video"></iframe>`;
+  return `<video controls><source src="${esc(url)}">Tu navegador no soporta video.</video>`;
+}
+
+function getAllCategories() { return Object.keys(rankingData); }
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function switchPubSection(section) {
+  currentPubSection = section;
+  document.querySelectorAll('.pub-nav-item').forEach(el => {
+    const key = el.id.replace('pubNav','').toLowerCase();
+    el.classList.toggle('active', key === section);
+  });
+  renderPublicView();
+}
+
+function renderPublicView() {
+  const content = document.getElementById('pubContent');
+  if (!content) return;
+  switch(currentPubSection) {
+    case 'inicio':   content.innerHTML = renderPubInicio();   break;
+    case 'torneos':  content.innerHTML = renderPubTorneos();  break;
+    case 'noticias': content.innerHTML = renderPubNoticias(); break;
+    case 'ranking':  content.innerHTML = renderPubRanking();  break;
+    default:         content.innerHTML = renderPubInicio();
+  }
+}
+
+// ============================================================
+// INICIO
+// ============================================================
+function renderPubInicio() {
+  const openT = tournaments.filter(t => t.registrationOpen && t.status !== 'finished');
+  const latestNews = noticiasData.slice().sort((a,b)=>(b.date||b.timestamp||'').localeCompare(a.date||a.timestamp||'')).slice(0,3);
+
+  const hero = `
+    <div class="pub-hero">
+      <div class="pub-hero-eyebrow">Portal del Jugador</div>
+      <div class="pub-hero-title">Bienvenido a<br>Torneos Express</div>
+      <div class="pub-hero-sub">Inscribete en los torneos disponibles, consulta el ranking y mantente al dia con las ultimas noticias de nosotros.</div>
+      <div class="pub-hero-actions">
+        ${openT.length
+          ? `<button class="btn-gold" onclick="switchPubSection('torneos')">Ver torneos disponibles</button>`
+          : `<button class="btn-gold" onclick="switchPubSection('torneos')">Ver torneos</button>`}
+        <button class="btn-gold-outline" onclick="switchPubSection('ranking')">Ver Ranking</button>
+      </div>
+    </div>`;
+
+  let tourneosBlock = '';
+  if (openT.length) {
+    const cards = openT.map(t => `
+      <div class="tc-h">
+        ${t.imageData?`<img class="tc-h-img" src="${t.imageData}" style="object-position:${t.imagePosition||'center center'}" alt="${esc(t.name)}">`:'<div class="tc-h-stripe"></div>'}
+        <div class="tc-h-body">
+          <div class="tc-h-cat">${esc(t.category||'General')}</div>
+          <div class="tc-h-name">${esc(t.name)}</div>
+          ${t.date?`<div class="tc-h-meta">&#128197; ${t.date}${t.startTime?` &middot; ${t.startTime}hs`:''}</div>`:''}
+          ${t.venue?`<div class="tc-h-meta">&#128205; ${esc(t.venue)}</div>`:''}
+        </div>
+        <div class="tc-h-footer">
+          <span class="tc-h-pairs">&#127934; ${(t.pairs||[]).length} parejas</span>
+          <button class="btn-gold" style="padding:7px 14px;font-size:12px" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
+        </div>
+      </div>`).join('');
+    tourneosBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">Proximos <span>Torneos</span></div>
+          <button class="pub-see-all" onclick="switchPubSection('torneos')">Ver todos →</button>
+        </div>
+        <div class="tourn-scroll-wrap"><div class="tourn-scroll-track">${cards}</div></div>
+      </div>`;
+  } else {
+    tourneosBlock = `
+      <div style="margin-bottom:36px">
+        <div class="pub-sec-hdr">
+          <div class="pub-sec-title">Proximos <span>Torneos</span></div>
+        </div>
+        <div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:32px;text-align:center">
+          <div style="font-size:32px;margin-bottom:12px">&#127934;</div>
+          <div style="font-size:14px;color:#555;margin-bottom:16px">No hay torneos abiertos en este momento.</div>
+          <button class="btn-gold-outline" onclick="openDemandaModal()">Registrar mi interes</button>
+        </div>
+      </div>`;
+  }
+
+  const videoBlock = videoConfig ? `
+    <div style="margin-bottom:36px">
+      <div class="pub-sec-hdr" style="margin-bottom:14px">
+        <div class="pub-sec-title">&#127909; Video de <span>Presentacion</span></div>
+      </div>
+      <div class="video-player-wrap">${getEmbedHtml(videoConfig.url)}</div>
+    </div>` : '';
+
+  const noveltyCards = latestNews.length
+    ? latestNews.map(n=>`
+        <div class="pub-nc">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+            ${tipoBadge(n.tipo||'noticia')}
+            ${n.date?`<span style="font-size:11px;color:#555">${n.date}</span>`:''}
+          </div>
+          ${n.imageData?`<img class="post-img" src="${n.imageData}">`:''}
+          <div class="pub-nc-title">${esc(n.title)}</div>
+          ${n.body?`<div class="pub-nc-body" style="margin-top:6px">${esc(n.body)}</div>`:''}
+        </div>`).join('')
+    : `<div style="background:#141414;border:1px dashed #2a2419;border-radius:12px;padding:32px;text-align:center">
+        <div style="font-size:32px;margin-bottom:10px">&#128226;</div>
+        <div style="font-size:14px;color:#555">Aun no hay novedades publicadas.</div>
+      </div>`;
+
+  const newsBlock = `
+    <div style="margin-bottom:8px">
+      <div class="pub-sec-hdr">
+        <div class="pub-sec-title">Ultimas <span>Novedades</span></div>
+        ${latestNews.length?`<button class="pub-see-all" onclick="switchPubSection('noticias')">Ver todas →</button>`:''}
+      </div>
+      ${noveltyCards}
+    </div>`;
+
+  return hero + videoBlock + tourneosBlock + newsBlock;
+}
+
+// ============================================================
+// TORNEOS
+// ============================================================
+function renderPubTorneos() {
+  const openT = tournaments.filter(t => t.registrationOpen && t.status !== 'finished');
+  const allCats = [...new Set(openT.map(t=>t.category||'General').filter(Boolean))].sort();
+  const filtered = currentPubTournCat && currentPubTournCat !== 'all'
+    ? openT.filter(t=>(t.category||'General')===currentPubTournCat)
+    : openT;
+
+  const chips = allCats.length > 1
+    ? `<div class="cat-filters">
+        <button class="cat-chip ${!currentPubTournCat||currentPubTournCat==='all'?'active':''}" onclick="filterPubTorneos('all')">Todos</button>
+        ${allCats.map(c=>`<button class="cat-chip ${currentPubTournCat===c?'active':''}" onclick="filterPubTorneos('${esc(c)}')">${esc(c)}</button>`).join('')}
+      </div>` : '';
+
+  const cards = filtered.length
+    ? filtered.map(t=>`
+        <div class="tc-full">
+          <div class="tc-full-stripe"></div>
+          <div class="tc-full-body">
+            ${t.imageData?`<img class="tc-full-img" src="${t.imageData}" style="object-position:${t.imagePosition||'center center'}" alt="${esc(t.name)}">`:''}
+            <div class="tc-full-info">
+              <div class="tc-full-cat">${esc(t.category||'General')}</div>
+              <div class="tc-full-name">${esc(t.name)}</div>
+              <div class="tc-full-meta">
+                ${t.date?`&#128197; ${t.date}${t.startTime?` &middot; ${t.startTime}hs`:''}`:''}&nbsp;&nbsp;
+                ${t.venue?`&#128205; ${esc(t.venue)}&nbsp;&nbsp;`:''}
+                &#127934; ${(t.pairs||[]).length} parejas inscriptas
+              </div>
+            </div>
+            <button class="btn-gold" style="white-space:nowrap" onclick="openInscripcionModal('${t.id}')">Inscribirse</button>
+          </div>
+        </div>`).join('')
+    : `<div class="pub-empty">
+        <div class="pub-empty-icon">&#127934;</div>
+        <div class="pub-empty-t">Sin torneos disponibles</div>
+        <div class="pub-empty-s">${currentPubTournCat&&currentPubTournCat!=='all'?'No hay torneos en esta categoria.':'No hay torneos abiertos en este momento.'}</div>
+      </div>`;
+
+  return `
+    <div style="margin-bottom:24px">
+      <div class="pub-sec-title" style="font-size:20px;margin-bottom:4px">Torneos <span>Disponibles</span></div>
+      <div style="font-size:13px;color:#555">${openT.length} torneo${openT.length!==1?'s':''} abierto${openT.length!==1?'s':''} a inscripcion</div>
+    </div>
+    ${chips}
+    ${cards}
+    <div class="pub-demand-box">
+      <div class="pub-demand-box-t">&#128233; No encuentras tu categoria?</div>
+      <div class="pub-demand-box-s">Registra tu interes y el administrador lo tendra en cuenta para organizar futuros torneos.</div>
+      <button class="btn-gold-outline" onclick="openDemandaModal()">Anotarme aunque no haya torneo</button>
+    </div>`;
+}
+
+function filterPubTorneos(cat) { currentPubTournCat = cat; renderPublicView(); }
+
+// ============================================================
+// NOTICIAS
+// ============================================================
+function renderPubNoticias() {
+  const sorted = noticiasData.slice().sort((a,b)=>(b.date||b.timestamp||'').localeCompare(a.date||a.timestamp||''));
+  const tipos = [...new Set(sorted.map(n=>n.tipo||'noticia'))];
+  const activeFilter = window._noticiaFilter || 'all';
+  const filtered = activeFilter === 'all' ? sorted : sorted.filter(n=>(n.tipo||'noticia')===activeFilter);
+
+  const chips = tipos.length > 1 ? `
+    <div class="cat-filters" style="margin-bottom:20px">
+      <button class="cat-chip ${activeFilter==='all'?'active':''}" onclick="window._noticiaFilter='all';renderPublicView()">Todos</button>
+      ${tipos.map(t=>{
+        const labels={noticia:'Noticias',consejo:'Consejos',anuncio:'Anuncios'};
+        return `<button class="cat-chip ${activeFilter===t?'active':''}" onclick="window._noticiaFilter='${t}';renderPublicView()">${labels[t]||t}</button>`;
+      }).join('')}
+    </div>` : '';
+
+  const cards = filtered.length
+    ? filtered.map(n=>`
+        <div class="pub-nc">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+            ${tipoBadge(n.tipo||'noticia')}
+            ${n.date?`<span style="font-size:11px;color:#555">${n.date}</span>`:''}
+          </div>
+          ${n.imageData?`<img class="post-img" src="${n.imageData}">`:''}
+          <div class="pub-nc-title">${esc(n.title)}</div>
+          ${n.body?`<div class="pub-nc-body" style="margin-top:6px">${esc(n.body)}</div>`:''}
+        </div>`).join('')
+    : `<div class="pub-empty" style="padding:40px 0">
+        <div class="pub-empty-icon">&#128226;</div>
+        <div class="pub-empty-t">Aun no hay novedades publicadas</div>
+        <div class="pub-empty-s">El administrador publicara anuncios, consejos y noticias aqui.</div>
+      </div>`;
+
+  return `
+    <div style="margin-bottom:24px">
+      <div class="pub-sec-title" style="font-size:20px"><span>Novedades</span> del Club</div>
+      <div style="font-size:13px;color:#555;margin-top:4px">${sorted.length} publicacion${sorted.length!==1?'es':''}</div>
+    </div>
+    ${chips}${cards}`;
+}
+
+// ============================================================
+// RANKING
+// ============================================================
+function renderPubRanking() {
+  const cats = getAllCategories();
+  if (!cats.length) return `
+    <div style="margin-bottom:24px">
+      <div class="pub-sec-title" style="font-size:20px"><span>Ranking</span> Torneo Express</div>
+    </div>
+    <div class="pub-empty">
+      <div class="pub-empty-icon">&#127941;</div>
+      <div class="pub-empty-t">Ranking no disponible</div>
+      <div class="pub-empty-s">El administrador aun no ha publicado el ranking.</div>
+    </div>`;
+
+  const activeCat = (currentRankingCategory && rankingData[currentRankingCategory]) ? currentRankingCategory : cats[0];
+  const tabs = cats.map(c=>
+    `<button class="pub-rank-tab ${c===activeCat?'active':''}" onclick="currentRankingCategory='${esc(c)}';renderPublicView()">${esc(c)}</button>`
+  ).join('');
+  const players = (rankingData[activeCat]||[]).slice().sort((a,b)=>b.points-a.points);
+  const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
+  const rows = players.length
+    ? players.map((p,i)=>{
+        const posCol = i===0?'#FFB800':i===1?'#aaa':i===2?'#cd7f32':'#555';
+        return `<tr>
+          <td style="color:${posCol};text-align:center">${medals[i]||i+1}</td>
+          <td style="font-weight:${i<3?700:500}">${esc(p.name)}</td>
+          <td style="text-align:right;font-weight:800;color:#FFB800;font-size:15px">${p.points}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="3" style="text-align:center;color:#555;padding:32px;font-size:13px">Sin datos para esta categoria</td></tr>`;
+
+  return `
+    <div style="margin-bottom:24px">
+      <div class="pub-sec-title" style="font-size:20px"><span>Ranking</span> Torneo Express</div>
+      <div style="font-size:13px;color:#555;margin-top:4px">Categoria: ${esc(activeCat)} &nbsp;·&nbsp; ${players.length} jugador${players.length!==1?'es':''}</div>
+      <div style="font-size:11px;color:#3a3a3a;margin-top:6px;letter-spacing:.2px">Ranking actualizado desde las fechas de Marzo 2026</div>
+    </div>
+    <div class="pub-rank-tabs">${tabs}</div>
+    <div style="overflow-x:auto;border-radius:12px;overflow:hidden;border:1px solid #2a2419">
+      <table class="pub-rtable">
+        <thead><tr>
+          <th style="width:56px;text-align:center">#</th>
+          <th>Jugador</th>
+          <th style="text-align:right">Puntos</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ============================================================
+// INSCRIPCION MODAL
+// ============================================================
+function openInscripcionModal(tournId) {
+  const t = tournaments.find(x => x.id === tournId);
+  if (!t) return;
+  document.getElementById('inscTournId').value = tournId;
+  document.getElementById('inscripcionTournInfo').innerHTML =
+    `<b style="color:#fff;font-size:14px">${esc(t.name)}</b>`
+    +(t.date?` &nbsp;·&nbsp; 📅 ${t.date}`:'')
+    +(t.venue?` &nbsp;·&nbsp; 📍 ${esc(t.venue)}`:'')
+    +(t.category?` &nbsp;·&nbsp; <b style="color:#4af">🏅 ${esc(t.category)}</b>`:'');
+  document.getElementById('inscCategory').value = t.category || '';
+  const dl = document.getElementById('inscCatList');
+  if (dl) {
+    const cs = new Set([...DEFAULT_CATEGORIES, ...getAllCategories()]);
+    dl.innerHTML = [...cs].map(c=>`<option value="${esc(c)}">`).join('');
+  }
+  ['inscP1Name','inscP1Phone','inscP1Comuna','inscP2Name','inscP2Phone','inscP2Comuna'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('inscripcionModal').classList.remove('hidden');
+  setTimeout(()=>{const el=document.getElementById('inscP1Name');if(el)el.focus();},50);
+}
+
+function closeInscripcionModal() { document.getElementById('inscripcionModal').classList.add('hidden'); }
+
+function submitInscripcion() {
+  const tournId  = document.getElementById('inscTournId').value;
+  const category = (document.getElementById('inscCategory').value||'').trim();
+  const p1Name   = (document.getElementById('inscP1Name').value||'').trim();
+  const p1Phone  = (document.getElementById('inscP1Phone').value||'').trim();
+  const p1Comuna = (document.getElementById('inscP1Comuna').value||'').trim();
+  const p2Name   = (document.getElementById('inscP2Name').value||'').trim();
+  const p2Phone  = (document.getElementById('inscP2Phone').value||'').trim();
+  const p2Comuna = (document.getElementById('inscP2Comuna').value||'').trim();
+  if (!p1Name||!p1Phone||!p2Name||!p2Phone) { alert('Completa los nombres y teléfonos de ambos jugadores'); return; }
+  const t = tournaments.find(x => x.id === tournId);
+  if (!t) { alert('Torneo no encontrado'); return; }
+  inscripcionesData.push({
+    id: 'INS'+Date.now()+Math.random().toString(36).slice(2),
+    tournamentId: tournId, tournamentName: t.name, category,
+    player1: {name:p1Name, phone:p1Phone, comuna:p1Comuna},
+    player2: {name:p2Name, phone:p2Phone, comuna:p2Comuna},
+    timestamp: new Date().toISOString(), status: 'pending'
+  });
+  saveInscripcionesToStorage();
+  closeInscripcionModal();
+  const content = document.getElementById('pubContent');
+  if (content) content.innerHTML = `
+    <div style="text-align:center;padding:80px 20px">
+      <div style="font-size:56px;margin-bottom:16px">&#9989;</div>
+      <h3 style="font-size:24px;font-weight:900;margin-bottom:12px;color:#FFB800">Inscripcion enviada</h3>
+      <p style="font-size:14px;color:#888;margin-bottom:28px;max-width:380px;margin-left:auto;margin-right:auto">Tu inscripcion al torneo <b style="color:#fff">${esc(t.name)}</b> fue recibida.<br>El administrador la revisara y te confirmara por telefono.</p>
+      <button class="btn-gold" onclick="switchPubSection('torneos')">Ver mas torneos</button>
+    </div>`;
+}
+
+// ============================================================
+// DEMANDA MODAL
+// ============================================================
+function openDemandaModal() {
+  ['demP1Name','demP1Phone','demP2Name','demP2Phone','demandaCategory'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const dl = document.getElementById('demandaCatList');
+  if (dl) {
+    const cs = new Set([...DEFAULT_CATEGORIES, ...getAllCategories()]);
+    dl.innerHTML = [...cs].map(c=>`<option value="${esc(c)}">`).join('');
+  }
+  document.getElementById('demandaModal').classList.remove('hidden');
+  setTimeout(()=>{const el=document.getElementById('demandaCategory');if(el)el.focus();},50);
+}
+
+function closeDemandaModal() { document.getElementById('demandaModal').classList.add('hidden'); }
+
+function submitDemanda() {
+  const category = (document.getElementById('demandaCategory').value||'').trim();
+  const p1Name   = (document.getElementById('demP1Name').value||'').trim();
+  const p1Phone  = (document.getElementById('demP1Phone').value||'').trim();
+  const p2Name   = (document.getElementById('demP2Name').value||'').trim();
+  const p2Phone  = (document.getElementById('demP2Phone').value||'').trim();
+  if (!category) { alert('Elige una categoria'); return; }
+  if (!p1Name||!p1Phone||!p2Name||!p2Phone) { alert('Completa los nombres y telefonos de ambos jugadores'); return; }
+  demandaData.push({
+    id: 'DEM'+Date.now()+Math.random().toString(36).slice(2),
+    category,
+    player1:{name:p1Name,phone:p1Phone}, player2:{name:p2Name,phone:p2Phone},
+    timestamp: new Date().toISOString()
+  });
+  saveDemandaToStorage();
+  closeDemandaModal();
+  const content = document.getElementById('pubContent');
+  if (content) content.innerHTML = `
+    <div style="text-align:center;padding:80px 20px">
+      <div style="font-size:56px;margin-bottom:16px">&#128233;</div>
+      <h3 style="font-size:24px;font-weight:900;margin-bottom:12px;color:#FFB800">Interes registrado</h3>
+      <p style="font-size:14px;color:#888;margin-bottom:28px;max-width:380px;margin-left:auto;margin-right:auto">Anotamos tu interes en la categoria <b style="color:#fff">${esc(category)}</b>.<br>El administrador lo tendra en cuenta para futuros torneos.</p>
+      <button class="btn-gold" onclick="switchPubSection('torneos')">Volver a torneos</button>
+    </div>`;
+}
+
+// ============================================================
+// INIT — load all data then render
+// ============================================================
+(async () => {
+  await Promise.all([
+    loadTournaments(),
+    loadRanking(),
+    loadInscripciones(),
+    loadDemanda(),
+    loadNoticias(),
+    loadVideoConfig()
+  ]);
+  renderPublicView();
+})();
+</script>
+</body>
+</html>
