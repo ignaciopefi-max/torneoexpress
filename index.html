@@ -581,6 +581,7 @@ let demandaData = [];
 let noticiasData = [];
 let videoConfig = null;
 let editingNoticiaId = null;
+let _ncVideoDataUrl  = '';
 let currentDashboardView = 'tournaments';
 let currentRankingCategory = null;
 let currentPubSection = 'inicio';
@@ -2973,6 +2974,25 @@ function clearDemanda() {
 // ADMIN — NOVEDADES (noticias + consejos + anuncios + video)
 // ============================================================
 
+function _noticiaMedia(n) {
+  const url = n.videoUrl || '';
+  if (url) {
+    const ytId = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    if (ytId) return `<iframe style="width:100%;height:120px;display:block;border:0;pointer-events:auto" src="https://www.youtube.com/embed/${ytId[1]}?rel=0" allowfullscreen></iframe>`;
+    const vmId = url.match(/vimeo\.com\/(\d+)/);
+    if (vmId) return `<iframe style="width:100%;height:120px;display:block;border:0;pointer-events:auto" src="https://player.vimeo.com/video/${vmId[1]}" allowfullscreen></iframe>`;
+    if (url.startsWith('data:video/') || /\.(mp4|webm|ogg)(\?|$)/i.test(url)) {
+      return `<video style="width:100%;height:120px;display:block;object-fit:cover;pointer-events:auto" src="${url}" controls></video>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;background:#0d0d0d;width:100%;height:120px;text-decoration:none;flex-direction:column;gap:5px">
+      <span style="font-size:26px;color:#FFB800">&#9654;</span>
+      <span style="font-size:10px;color:#FFB800;font-weight:700">Ver video &#8594;</span>
+    </a>`;
+  }
+  if (n.imageData) return `<img class="nc-img" src="${n.imageData}">`;
+  return `<div class="nc-stripe nc-stripe-${n.tipo||'noticia'}"></div>`;
+}
+
 function tipoBadge(tipo) {
   const cfg = {noticia:{l:'Noticia',cls:'tipo-noticia'},consejo:{l:'Consejo',cls:'tipo-consejo'},anuncio:{l:'Anuncio',cls:'tipo-anuncio'}};
   const c = cfg[tipo] || {l: tipo||'General', cls:'tipo-noticia'};
@@ -3009,6 +3029,34 @@ function removeNoticiaImage(id) {
   n.imageData=''; saveNoticiasToStorage(); renderAdminNoticias();
 }
 
+function handleNoticiaVideoFile(input) {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 30*1024*1024) { alert('El video es demasiado grande (máx 30 MB)'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    _ncVideoDataUrl = e.target.result;
+    const prev = document.getElementById('ncVideoPrev');
+    if (prev) prev.innerHTML = `<video src="${_ncVideoDataUrl}" controls style="width:100%;max-height:120px;border-radius:6px;margin-top:6px"></video>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleNoticiaVideoFileEdit(id, input) {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 30*1024*1024) { alert('El video es demasiado grande (máx 30 MB)'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('editVideoPrev_'+id);
+    if (prev) { prev.dataset.videoData = e.target.result; prev.innerHTML = `<video src="${e.target.result}" controls style="width:100%;max-height:120px;border-radius:6px;margin-top:6px"></video>`; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeNoticiaVideo(id) {
+  const n = noticiasData.find(x=>x.id===id); if (!n) return;
+  n.videoUrl=''; saveNoticiasToStorage(); renderAdminNoticias();
+}
+
 function saveEditNoticia(id) {
   const n = noticiasData.find(x=>x.id===id); if (!n) return;
   n.tipo  = document.getElementById('editTipo_'+id).value || 'noticia';
@@ -3017,6 +3065,10 @@ function saveEditNoticia(id) {
   n.body  = (document.getElementById('editBody_'+id).value||'').trim();
   const prevEl = document.getElementById('editImagePreview_'+id);
   if (prevEl && prevEl.dataset.imageData) n.imageData = prevEl.dataset.imageData;
+  const vidPrevEl = document.getElementById('editVideoPrev_'+id);
+  const vidUrlEl  = document.getElementById('editVideoUrl_'+id);
+  if (vidPrevEl && vidPrevEl.dataset.videoData) n.videoUrl = vidPrevEl.dataset.videoData;
+  else if (vidUrlEl) n.videoUrl = vidUrlEl.value.trim();
   if (!n.title) { alert('Ingresa un titulo'); return; }
   editingNoticiaId = null;
   saveNoticiasToStorage(); renderAdminNoticias(); notify('Novedad actualizada');
@@ -3046,9 +3098,7 @@ function renderAdminNoticias() {
         ondragleave="ncDragLeave('${n.id}')"
         ondragend="ncDragEnd()"
         ondrop="ncDrop(event,'${n.id}')">
-      ${n.imageData
-        ? `<img class="nc-img" src="${n.imageData}">`
-        : `<div class="nc-stripe nc-stripe-${n.tipo||'noticia'}"></div>`}
+      ${_noticiaMedia(n)}
       <div class="nc-badge-wrap">${tipoBadge(n.tipo||'noticia')}</div>
       <div class="nc-body">
         <div class="nc-title">${esc(n.title)}</div>
@@ -3088,10 +3138,17 @@ function renderAdminNoticias() {
             <input type="file" id="editImage_${n.id}" accept="image/*" onchange="handleNoticiaImageEdit('${n.id}',this)">
             <img id="editImagePreview_${n.id}" ${n.imageData?`src="${n.imageData}" style="display:block;max-width:180px;margin-top:8px;border-radius:6px"`:'style="display:none"'} data-image-data="${n.imageData||''}">
           </div>
+          <div class="form-group">
+            <label>Video <span style="font-size:11px;color:#555">(URL o subir archivo MP4, máx 30 MB)</span></label>
+            <input id="editVideoUrl_${n.id}" placeholder="https://youtube.com/watch?v=... o link directo" value="${esc(n.videoUrl||'')}" style="margin-bottom:6px">
+            <input type="file" id="editVideoFile_${n.id}" accept="video/mp4,video/webm" onchange="handleNoticiaVideoFileEdit('${n.id}',this)">
+            <div id="editVideoPrev_${n.id}"></div>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-success btn-sm" onclick="saveEditNoticia('${n.id}')">Guardar cambios</button>
             <button class="btn-secondary btn-sm" onclick="editingNoticiaId=null;renderAdminNoticias()">Cancelar</button>
             ${n.imageData?`<button class="btn-danger btn-sm" onclick="removeNoticiaImage('${n.id}')">Quitar imagen</button>`:''}
+            ${n.videoUrl?`<button class="btn-danger btn-sm" onclick="removeNoticiaVideo('${n.id}')">Quitar video</button>`:''}
           </div>
         </div>`;
     }
@@ -3126,6 +3183,13 @@ function renderAdminNoticias() {
       <input type="file" id="noticiaImage" accept="image/*" onchange="handleNoticiaImage(this)">
       <img id="noticiaImagePreview" style="display:none;max-width:220px;margin-top:10px;border-radius:8px" data-image-data="">
     </div>
+    <div class="form-group">
+      <label>Video <span style="font-size:11px;color:#555">(YouTube, TikTok, Instagram o URL directa de MP4)</span></label>
+      <input id="ncVideoUrl" placeholder="https://youtube.com/watch?v=... o link directo" style="margin-bottom:8px">
+      <div style="font-size:11px;color:#444;margin-bottom:6px;text-align:center">— o subir archivo MP4 (máx 30 MB) —</div>
+      <input type="file" id="ncVideoFile" accept="video/mp4,video/webm" onchange="handleNoticiaVideoFile(this)">
+      <div id="ncVideoPrev"></div>
+    </div>
     <div style="margin-bottom:30px"><button class="btn-primary" onclick="publishNoticia()">Publicar</button></div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
@@ -3148,9 +3212,12 @@ function publishNoticia() {
   const body  = (document.getElementById('noticiaBody').value||'').trim();
   const prev  = document.getElementById('noticiaImagePreview');
   const imageData = (prev&&prev.dataset.imageData) ? prev.dataset.imageData : '';
+  const videoUrlInput = (document.getElementById('ncVideoUrl').value||'').trim();
+  const videoUrl = _ncVideoDataUrl || videoUrlInput;
   if (!title) { alert('Ingresa un titulo'); return; }
+  _ncVideoDataUrl = '';
   noticiasData.forEach(n => n.order = (n.order ?? 0) + 1);
-  noticiasData.unshift({id:'NOT'+Date.now(), tipo, title, date, body, imageData, timestamp:new Date().toISOString(), order: 0});
+  noticiasData.unshift({id:'NOT'+Date.now(), tipo, title, date, body, imageData, videoUrl, timestamp:new Date().toISOString(), order: 0});
   saveNoticiasToStorage(); renderAdminNoticias(); notify('Novedad publicada');
 }
 

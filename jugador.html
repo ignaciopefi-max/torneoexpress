@@ -379,6 +379,36 @@ function notify(msg) {
   setTimeout(() => el.remove(), 2800);
 }
 
+function _pncMedia(n) {
+  const url = n.videoUrl || '';
+  if (url) {
+    const ytId = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    if (ytId) return `<iframe class="pnc-img" src="https://www.youtube.com/embed/${ytId[1]}?rel=0" frameborder="0" allowfullscreen></iframe>`;
+    const vmId = url.match(/vimeo\.com\/(\d+)/);
+    if (vmId) return `<iframe class="pnc-img" src="https://player.vimeo.com/video/${vmId[1]}" frameborder="0" allowfullscreen></iframe>`;
+    if (url.startsWith('data:video/') || /\.(mp4|webm|ogg)(\?|$)/i.test(url)) {
+      return `<video class="pnc-img" src="${url}" controls></video>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;background:#0d0d0d;width:100%;height:120px;text-decoration:none;flex-direction:column;gap:5px">
+      <span style="font-size:26px;color:#FFB800">&#9654;</span>
+      <span style="font-size:10px;color:#FFB800;font-weight:700">Ver video &#8594;</span>
+    </a>`;
+  }
+  if (n.imageData) return `<img class="pnc-img" src="${n.imageData}">`;
+  return `<div class="pnc-stripe pnc-stripe-${n.tipo||'noticia'}"></div>`;
+}
+
+function _pubVideoFull(url) {
+  const ytId = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (ytId) return `<div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:14px"><iframe src="https://www.youtube.com/embed/${ytId[1]}?rel=0" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`;
+  const vmId = url.match(/vimeo\.com\/(\d+)/);
+  if (vmId) return `<div style="position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;margin-bottom:14px"><iframe src="https://player.vimeo.com/video/${vmId[1]}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`;
+  if (url.startsWith('data:video/') || /\.(mp4|webm|ogg)(\?|$)/i.test(url)) {
+    return `<video src="${url}" controls style="width:100%;max-height:320px;border-radius:10px;margin-bottom:14px;background:#000;display:block"></video>`;
+  }
+  return `<a href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;background:#141414;border:1px solid #2a2419;border-radius:10px;padding:14px;text-decoration:none;margin-bottom:14px;color:#FFB800;font-weight:700;font-size:14px">&#9654; Ver video &#8594;</a>`;
+}
+
 function tipoBadge(tipo) {
   const cfg = {noticia:{l:'Noticia',cls:'tipo-noticia'},consejo:{l:'Consejo',cls:'tipo-consejo'},anuncio:{l:'Anuncio',cls:'tipo-anuncio'}};
   const c = cfg[tipo] || {l: tipo||'General', cls:'tipo-noticia'};
@@ -583,9 +613,7 @@ function renderPubInicio() {
   // ── 5. Novedades ─────────────────────────────────────────
   const pncCards = latestNews.map(n => `
     <div class="pnc-card" onclick="switchPubSection('noticias')">
-      ${n.imageData
-        ? `<img class="pnc-img" src="${n.imageData}">`
-        : `<div class="pnc-stripe pnc-stripe-${n.tipo||'noticia'}"></div>`}
+      ${_pncMedia(n)}
       <div class="pnc-badge">${tipoBadge(n.tipo||'noticia')}</div>
       <div class="pnc-body">
         <div class="pnc-title">${esc(n.title)}</div>
@@ -693,6 +721,7 @@ function renderPubNoticias() {
             ${n.date?`<span style="font-size:11px;color:#555">${n.date}</span>`:''}
           </div>
           ${n.imageData?`<img class="post-img" src="${n.imageData}">`:''}
+          ${n.videoUrl?_pubVideoFull(n.videoUrl):''}
           <div class="pub-nc-title">${esc(n.title)}</div>
           ${n.body?`<div class="pub-nc-body" style="margin-top:6px">${esc(n.body)}</div>`:''}
         </div>`).join('')
