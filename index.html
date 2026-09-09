@@ -771,7 +771,8 @@ function promptAddCategory() {
   const name = prompt('Nombre de la nueva categoría (ej: 1ra, Damas A+):');
   if (!name || !name.trim()) return;
   const cat = name.trim();
-  if (rankingData[cat] !== undefined) { alert('Esa categoría ya existe'); return; }
+  const existing = Object.keys(rankingData).find(k => normalizeCategoryKey(k) === normalizeCategoryKey(cat));
+  if (existing) { alert(`Ya existe una categoría equivalente: "${existing}"`); currentRankingCategory = existing; renderRankingSection(); return; }
   rankingData[cat] = [];
   currentRankingCategory = cat;
   saveRankingToStorage();
@@ -1268,13 +1269,36 @@ function getPlayersFromPair(t, pairId) {
   return pair.name.split('/').map(s => s.trim()).filter(Boolean);
 }
 
-// Encuentra la categoría de ranking ya existente que coincide (sin distinguir
-// mayúsculas ni espacios) con el texto ingresado en el torneo, para evitar que
-// una diferencia de tipeo cree una categoría duplicada y "pierda" los puntos.
+// Normaliza un nombre de categoría para comparaciones flexibles: ignora
+// mayúsculas, tildes, espacios, la palabra "categoría" y sinónimos ordinales
+// (Primera=1ra, Segunda=2da, Tercera=3ra, etc.), de forma que "3ra", "3RA",
+// "Tercera" y "3ra Categoría" se consideren la misma categoría.
+const CATEGORY_ORDINAL_SYNONYMS = {
+  primera: '1ra', segunda: '2da', tercera: '3ra',
+  cuarta: '4ta', quinta: '5ta', sexta: '6ta',
+  septima: '7ma', setima: '7ma', octava: '8va'
+};
+function normalizeCategoryKey(s) {
+  let n = (s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes
+    .toLowerCase()
+    .replace(/\bcategoria\b/g, '') // "categoria" no aporta identidad propia
+    .trim();
+  Object.keys(CATEGORY_ORDINAL_SYNONYMS).forEach(word => {
+    n = n.replace(new RegExp('\\b' + word + '\\b', 'g'), CATEGORY_ORDINAL_SYNONYMS[word]);
+  });
+  return n.replace(/\s+/g, ''); // may/min/tildes/espacios no distinguen categorías
+}
+
+// Encuentra la categoría de ranking ya existente que coincide (de forma
+// flexible, ver normalizeCategoryKey) con el texto ingresado en el torneo,
+// para evitar que una diferencia de escritura cree una categoría duplicada
+// y "pierda" los puntos.
 function resolveExistingCategoryKey(rawCat) {
   const trimmed = (rawCat || '').trim();
   if (!trimmed) return '';
-  const match = Object.keys(rankingData).find(k => k.trim().toLowerCase() === trimmed.toLowerCase());
+  const norm = normalizeCategoryKey(trimmed);
+  const match = Object.keys(rankingData).find(k => normalizeCategoryKey(k) === norm);
   return match || trimmed;
 }
 
@@ -3358,12 +3382,48 @@ function buildRankingRowsHtml(allPlayers, indices) {
     return `<tr>
       <td style="text-align:center;font-weight:700;color:${posColor};width:60px">${medals[i]||(i+1)}</td>
       <td style="font-weight:600">${esc(p.name)}</td>
-      <td style="text-align:center;font-weight:700;color:#4af;font-size:15px">${p.points}</td>
+      <td id="rk-pts-${i}" style="text-align:center;font-weight:700;color:#4af;font-size:15px;cursor:pointer" onclick="editRankingPointsCell(${i})" title="Clic para editar puntos">${p.points}</td>
       <td style="text-align:center;width:50px">
         <button class="btn-danger btn-sm" onclick="removeRankingPlayer(${i})">✕</button>
       </td>
     </tr>`;
   }).join('');
+}
+
+// Reemplaza la celda de puntos por un input numérico editable in-place
+function editRankingPointsCell(idx) {
+  const cat = currentRankingCategory;
+  const players = cat ? (rankingData[cat] || []) : [];
+  const p = players[idx];
+  const td = document.getElementById('rk-pts-' + idx);
+  if (!p || !td) return;
+  td.innerHTML = `<input type="number" min="0" step="any" id="rk-pts-input-${idx}" value="${p.points}"
+    style="width:80px;text-align:center;font-weight:700;color:#4af;font-size:15px;background:#111;border:1px solid #4af;border-radius:4px;padding:2px 4px"
+    onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){this.value='${p.points}';this.blur();}"
+    onblur="saveRankingPointsEdit(${idx}, this.value)">`;
+  const inp = document.getElementById('rk-pts-input-' + idx);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function saveRankingPointsEdit(idx, rawValue) {
+  const cat = currentRankingCategory;
+  const players = cat ? (rankingData[cat] || []) : [];
+  const p = players[idx];
+  if (!p) { renderRankingSection(); return; }
+  const val = parseFloat(String(rawValue).replace(',', '.'));
+  if (isNaN(val) || val < 0) {
+    alert('Ingresa un número válido (0 o mayor)');
+    renderRankingSection();
+    return;
+  }
+  const changed = val !== p.points;
+  p.points = val;
+  players.sort((a, b) => b.points - a.points);
+  if (changed) {
+    saveRankingToStorage();
+    notify(`Puntos de "${p.name}" actualizados a ${val}`);
+  }
+  renderRankingSection();
 }
 
 // Filtra la tabla en tiempo real sin re-renderizar toda la sección
