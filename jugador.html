@@ -281,6 +281,7 @@ let videoConfig = null;
 let currentPubSection = 'inicio';
 let currentRankingCategory = null;
 let currentPubTournCat = null;
+let pubRankingSearchTerm = '';
 const DEFAULT_CATEGORIES = ['1ra','2da','3ra','4ta','5ta','6ta','Damas A+','Damas B'];
 
 // ============================================================
@@ -742,6 +743,44 @@ function renderPubNoticias() {
 // ============================================================
 // RANKING
 // ============================================================
+function switchPubRankingCategory(c) {
+  currentRankingCategory = c;
+  pubRankingSearchTerm = '';
+  renderPublicView();
+}
+
+function buildPubRankingRows(players) {
+  const term = (pubRankingSearchTerm || '').trim().toLowerCase();
+  const indices = players
+    .map((_, i) => i)
+    .filter(i => !term || players[i].name.toLowerCase().includes(term));
+  if (!indices.length) {
+    return `<tr><td colspan="3" style="text-align:center;color:#555;padding:32px;font-size:13px">
+      ${term ? `No se encontraron jugadores que coincidan con "${esc(pubRankingSearchTerm.trim())}".` : 'Sin datos para esta categoria'}
+    </td></tr>`;
+  }
+  const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
+  return indices.map(i => {
+    const p = players[i];
+    const posCol = i===0?'#FFB800':i===1?'#aaa':i===2?'#cd7f32':'#555';
+    return `<tr>
+      <td style="color:${posCol};text-align:center">${medals[i]||i+1}</td>
+      <td style="font-weight:${i<3?700:500}">${esc(p.name)}</td>
+      <td style="text-align:right;font-weight:800;color:#FFB800;font-size:15px">${p.points}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Filtra en tiempo real sin re-renderizar toda la vista (evita perder el foco del input)
+function filterPubRankingTable(value) {
+  pubRankingSearchTerm = value;
+  const cats = getAllCategories();
+  const activeCat = (currentRankingCategory && rankingData[currentRankingCategory]) ? currentRankingCategory : cats[0];
+  const players = (rankingData[activeCat]||[]).slice().sort((a,b)=>b.points-a.points);
+  const tbody = document.getElementById('pubRankingBody');
+  if (tbody) tbody.innerHTML = buildPubRankingRows(players);
+}
+
 function renderPubRanking() {
   const cats = getAllCategories();
   if (!cats.length) return `
@@ -756,20 +795,10 @@ function renderPubRanking() {
 
   const activeCat = (currentRankingCategory && rankingData[currentRankingCategory]) ? currentRankingCategory : cats[0];
   const tabs = cats.map(c=>
-    `<button class="pub-rank-tab ${c===activeCat?'active':''}" onclick="currentRankingCategory='${esc(c)}';renderPublicView()">${esc(c)}</button>`
+    `<button class="pub-rank-tab ${c===activeCat?'active':''}" onclick="switchPubRankingCategory('${esc(c)}')">${esc(c)}</button>`
   ).join('');
   const players = (rankingData[activeCat]||[]).slice().sort((a,b)=>b.points-a.points);
-  const medals = ['\u{1F947}','\u{1F948}','\u{1F949}'];
-  const rows = players.length
-    ? players.map((p,i)=>{
-        const posCol = i===0?'#FFB800':i===1?'#aaa':i===2?'#cd7f32':'#555';
-        return `<tr>
-          <td style="color:${posCol};text-align:center">${medals[i]||i+1}</td>
-          <td style="font-weight:${i<3?700:500}">${esc(p.name)}</td>
-          <td style="text-align:right;font-weight:800;color:#FFB800;font-size:15px">${p.points}</td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="3" style="text-align:center;color:#555;padding:32px;font-size:13px">Sin datos para esta categoria</td></tr>`;
+  const rows = buildPubRankingRows(players);
 
   return `
     <div style="margin-bottom:24px">
@@ -778,6 +807,13 @@ function renderPubRanking() {
       <div style="font-size:11px;color:#3a3a3a;margin-top:6px;letter-spacing:.2px">Ranking actualizado desde las fechas de Marzo 2026</div>
     </div>
     <div class="pub-rank-tabs">${tabs}</div>
+    <div style="margin-bottom:14px;max-width:360px;position:relative">
+      <input id="pubRankingSearchInput" type="text" placeholder="🔍 Buscar jugador por nombre..." value="${esc(pubRankingSearchTerm)}"
+        oninput="filterPubRankingTable(this.value)"
+        style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f0f0f0;font-size:14px;padding:9px ${pubRankingSearchTerm?'34px':'12px'} 9px 12px;outline:none;font-family:inherit">
+      ${pubRankingSearchTerm ? `<button onclick="document.getElementById('pubRankingSearchInput').value='';filterPubRankingTable('')"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#888;font-size:16px;padding:2px 6px;cursor:pointer">✕</button>` : ''}
+    </div>
     <div style="overflow-x:auto;border-radius:12px;overflow:hidden;border:1px solid #2a2419">
       <table class="pub-rtable">
         <thead><tr>
@@ -785,7 +821,7 @@ function renderPubRanking() {
           <th>Jugador</th>
           <th style="text-align:right">Puntos</th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody id="pubRankingBody">${rows}</tbody>
       </table>
     </div>`;
 }

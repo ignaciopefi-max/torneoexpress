@@ -8,7 +8,11 @@
       "Bash(python *)",
       "Bash(node -e ' *)",
       "Bash(curl *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(mkdir -p /c/Users/ignac/AppData/Local/Temp/rk_test)",
+      "Bash(node harness.js)",
+      "Bash(sed \"s/eval\\(require\\('fs'\\).readFileSync\\('.\\\\/extracted_index.js', 'utf8'\\)\\);//\")",
+      "Bash(node combined.js)"
     ]
   }
 }
