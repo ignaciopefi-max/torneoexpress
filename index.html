@@ -473,6 +473,36 @@ label{display:block;font-size:13px;color:#aaa;margin-bottom:4px}
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="addPlayerModal">
+  <div class="modal" style="max-width:360px">
+    <h3>Inscripción de Jugador</h3>
+    <div class="form-group">
+      <label>Nombre y apellidos <span style="color:#f44;font-size:12px">*</span></label>
+      <input id="rpName" placeholder="Ej: Juan García"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('rpEmail').focus()}else if(event.key==='Escape'){closeAddPlayerModal()}">
+    </div>
+    <div class="form-group">
+      <label>Correo electrónico <span style="font-size:11px;color:#555">(opcional)</span></label>
+      <input id="rpEmail" type="email" placeholder="correo@ejemplo.com"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('rpPhone').focus()}else if(event.key==='Escape'){closeAddPlayerModal()}">
+    </div>
+    <div class="form-group">
+      <label>Teléfono <span style="font-size:11px;color:#555">(opcional)</span></label>
+      <input id="rpPhone" type="tel" placeholder="600 000 000"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('rpComuna').focus()}else if(event.key==='Escape'){closeAddPlayerModal()}">
+    </div>
+    <div class="form-group">
+      <label>Comuna <span style="font-size:11px;color:#555">(opcional)</span></label>
+      <input id="rpComuna" placeholder="Ej: Santiago, Las Condes"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();confirmAddPlayerRegistration()}else if(event.key==='Escape'){closeAddPlayerModal()}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeAddPlayerModal()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmAddPlayerRegistration()">+ Agregar Jugador</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="movePairModal">
   <div class="modal">
     <h3>Mover Pareja de Grupo</h3>
@@ -589,6 +619,18 @@ let currentPubSection = 'inicio';
 let currentPubTournCat = null;
 let appMode = 'admin';
 const DEFAULT_CATEGORIES = ['1ra','2da','3ra','4ta','5ta','6ta','Damas A+','Damas B'];
+
+// Estados de inscripción individual de jugadores (independientes de las parejas)
+const PLAYER_STATUS_ORDER = ['por_confirmar','confirmado','pago'];
+const PLAYER_STATUS_META = {
+  por_confirmar: { label: 'Por confirmar', color: '#FFB800', text: '#000' },
+  confirmado:    { label: 'Confirmado',    color: '#2a2',    text: '#fff' },
+  pago:          { label: 'Pagó',          color: '#4af',    text: '#000' }
+};
+function nextPlayerStatus(s) {
+  const idx = PLAYER_STATUS_ORDER.indexOf(s);
+  return PLAYER_STATUS_ORDER[(idx + 1) % PLAYER_STATUS_ORDER.length];
+}
 
 function getCurrentTournament() {
   return tournaments.find(t => t.id === currentTournamentId);
@@ -1089,6 +1131,8 @@ function renderConfigTab(t) {
     </div>
     <div class="pairs-list">${pairsList}</div>
 
+    ${buildRegisteredPlayersHtml(t)}
+
     <div class="section-title">Configuración de Grupos</div>
     <div class="form-grid">
       <div class="form-group"><label>Número de zonas/grupos</label><select onchange="saveField('zones',parseInt(this.value))">${zonesOpts}</select></div>
@@ -1255,6 +1299,96 @@ function confirmAddPair() {
   closeAddPairModal();
   renderTab();
   notify('Pareja agregada: ' + p1Name + ' / ' + p2Name);
+}
+
+// ── INSCRIPCIÓN INDIVIDUAL DE JUGADORES (independiente de las parejas) ──
+function openAddPlayerModal() {
+  ['rpName','rpEmail','rpPhone','rpComuna'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('addPlayerModal').classList.remove('hidden');
+  setTimeout(() => { const el = document.getElementById('rpName'); if (el) el.focus(); }, 50);
+}
+function closeAddPlayerModal() {
+  document.getElementById('addPlayerModal').classList.add('hidden');
+}
+function confirmAddPlayerRegistration() {
+  const name = (document.getElementById('rpName').value || '').trim();
+  if (!name) { alert('El nombre del jugador es obligatorio'); return; }
+  const email  = (document.getElementById('rpEmail').value || '').trim();
+  const phone  = (document.getElementById('rpPhone').value || '').trim();
+  const comuna = (document.getElementById('rpComuna').value || '').trim();
+  const t = getCurrentTournament();
+  if (!t.registeredPlayers) t.registeredPlayers = [];
+  t.registeredPlayers.push({
+    id: 'RP'+Date.now()+Math.random().toString(36).slice(2),
+    name, email, phone, comuna, status: 'por_confirmar'
+  });
+  upsertPlayer(name, email, phone);
+  saveToStorage();
+  closeAddPlayerModal();
+  renderTab();
+  notify('Jugador inscrito: ' + name);
+}
+function cycleRegisteredPlayerStatus(id) {
+  const t = getCurrentTournament(); if (!t) return;
+  const p = (t.registeredPlayers||[]).find(r => r.id === id);
+  if (!p) return;
+  p.status = nextPlayerStatus(p.status);
+  saveToStorage();
+  renderTab();
+}
+function removeRegisteredPlayer(id) {
+  const t = getCurrentTournament(); if (!t) return;
+  const p = (t.registeredPlayers||[]).find(r => r.id === id);
+  if (!p || !confirm(`¿Eliminar a "${p.name}" de los jugadores inscritos?`)) return;
+  t.registeredPlayers = (t.registeredPlayers||[]).filter(r => r.id !== id);
+  saveToStorage();
+  renderTab();
+}
+function buildRegisteredPlayersHtml(t) {
+  const players = t.registeredPlayers || [];
+  const counts = { por_confirmar: 0, confirmado: 0, pago: 0 };
+  players.forEach(p => {
+    if (!counts.hasOwnProperty(p.status)) p.status = 'por_confirmar';
+    counts[p.status]++;
+  });
+
+  const summary = PLAYER_STATUS_ORDER.map(s => {
+    const m = PLAYER_STATUS_META[s];
+    return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:20px;font-size:13px;color:#ccc">
+      <span style="width:10px;height:10px;border-radius:50%;background:${m.color};display:inline-block"></span>
+      ${m.label}: <b style="color:#fff">${counts[s]}</b>
+    </span>`;
+  }).join('');
+
+  const groups = PLAYER_STATUS_ORDER.map(s => {
+    const m = PLAYER_STATUS_META[s];
+    const items = players.filter(p => p.status === s);
+    const rows = items.length ? items.map(p => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#1a1a1a;border-left:3px solid ${m.color};border-radius:6px;margin-bottom:6px">
+        <span style="flex:1;font-weight:600">${esc(p.name)}</span>
+        ${p.phone?`<span style="font-size:12px;color:#666">${esc(p.phone)}</span>`:''}
+        <button onclick="cycleRegisteredPlayerStatus('${p.id}')" title="Clic para cambiar de estado"
+          style="background:${m.color};color:${m.text};font-weight:700;border:none;border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;white-space:nowrap">${m.label}</button>
+        <button class="btn-danger btn-sm" onclick="removeRegisteredPlayer('${p.id}')">✕</button>
+      </div>`).join('')
+      : `<div style="font-size:12px;color:#444;padding:2px 2px 10px">Sin jugadores en este estado</div>`;
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:${m.color};text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${esc(m.label)} (${counts[s]})</div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section-title">Jugadores Inscritos Individualmente</div>
+    <div style="margin-bottom:12px">
+      <button class="btn-primary" onclick="openAddPlayerModal()">+ Agregar Jugador</button>
+      <span style="font-size:12px;color:#555;margin-left:12px">Cada jugador tiene su propio estado, independiente de las parejas</span>
+    </div>
+    <div style="background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:12px 14px;margin-bottom:16px">${players.length?summary:'<span style="font-size:12px;color:#555">Sin jugadores inscritos aún</span>'}</div>
+    ${players.length ? groups : ''}
+  `;
 }
 
 // ============================================================
